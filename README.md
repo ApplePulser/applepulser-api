@@ -253,34 +253,36 @@ heartsync\Scripts\activate
 
 ## 프로젝트 구조
 
+```
 applepulser-api/
-├── heart_sync_backend/          # 프로젝트 설정
-│   ├── __init__.py
-│   ├── settings.py              # Django 설정
-│   ├── urls.py                  # 메인 URL 라우팅
-│   ├── asgi.py                  # WebSocket용 (나중에)
-│   └── wsgi.py                  # HTTP용
 │
-├── rooms/                       # 게임 방 관리 앱
-│   ├── __init__.py
-│   ├── models.py                # 데이터 모델 (Room, Player)
-│   ├── serializers.py           # JSON 변환
-│   ├── views.py                 # REST API 뷰
-│   ├── consumers.py             # WebSocket 핸들러 (나중에)
-│   ├── urls.py                  # API 엔드포인트
-│   ├── admin.py                 # 관리자 페이지
-│   └── tests.py                 # 테스트 코드
+├── heart_sync_backend/      # Django 프로젝트 설정 폴더
+│   ├── settings.py          # Django 설정 파일
+│   ├── urls.py              # 메인 URL 라우팅
+│   ├── asgi.py              # WebSocket용 (Phase 2)
+│   └── wsgi.py              # HTTP 서버용
 │
-├── docs/                        # 문서
-│   ├── architecture.md          # 아키텍처 문서 (이 파일)
-│   └── api_specification.md     # API 명세서
+├── rooms/                   # 게임 방 관리 앱
+│   ├── models.py            # Room, Player 모델
+│   ├── serializers.py       # 데이터 직렬화
+│   ├── views.py             # REST API 뷰
+│   ├── urls.py              # API 엔드포인트 라우팅
+│   ├── admin.py             # Admin 페이지 설정
+│   └── tests.py             # 테스트 코드
 │
-├── venv/                        # 가상환경 (git 제외)
-├── db.sqlite3                   # 데이터베이스 (git 제외)
-├── manage.py                    # Django 관리 명령어
-├── requirements.txt             # Python 패키지 목록
-├── .gitignore                   # Git 제외 파일
-└── README.md                    # 프로젝트 설명
+├── heartsync/               # Python 가상환경 (git 제외)
+├── db.sqlite3               # SQLite 데이터베이스 (git 제외)
+├── manage.py                # Django 관리 명령어
+├── requirements.txt         # Python 패키지 목록
+├── .gitignore               # Git 제외 파일 설정
+└── README.md                # 프로젝트 문서 (이 파일)
+```
+
+**주요 폴더 설명:**
+- `heart_sync_backend/`: Django 프로젝트 설정 및 전역 URL 관리
+- `rooms/`: 게임 방 및 플레이어 관리 기능 (핵심 앱)
+- `heartsync/`: 가상환경 폴더 (로컬에만 존재)
+
 ---
 
 ## 데이터베이스 설계
@@ -555,14 +557,14 @@ Django Admin을 통한 관리자 페이지 구현
 - 상태별 필터링 기능
 - 검색 기능으로 빠른 조회
 
-### WebSocket (실시간)
+---
 
-rooms/consumers.py
-└── GameConsumer (ws://localhost:8000/ws/room/{room_id}/)
-    ├── connect()           # 연결
-    ├── disconnect()        # 연결 해제
-    ├── receive()           # 메시지 수신
-    └── send_to_group()     # 브로드캐스트
+## WebSocket 실시간 통신 (Phase 2 예정)
+
+> **Phase 2에서 구현 예정**
+> - Django Channels를 사용한 WebSocket 서버
+> - 실시간 심박수 데이터 브로드캐스트
+> - 게임 이벤트 실시간 동기화
 
 ---
 
@@ -587,40 +589,30 @@ rooms/consumers.py
     ↓
 [안드로이드 앱] ← QR 코드 표시
 
-### 2. 실시간 심박수 흐름
+### 2. 실시간 심박수 흐름 (Phase 2 예정)
 
-[플레이어1 앱]
-    ↓ WebSocket send
-    ↓ {"type": "heartbeat", "bpm": 145}
-[GameConsumer]
-    ↓ receive()
-    ↓ 모든 플레이어 심박수 수집
-[Channel Layer]
-    ↓ group_send (broadcast)
-[모든 플레이어]
-    ↓ WebSocket receive
-    ↓ {"type": "heartbeat_broadcast", "players": [...]}
-[화면 업데이트]
+> **WebSocket을 통한 실시간 통신 (Phase 2에서 구현 예정)**
+>
+> 플레이어들의 심박수 데이터를 실시간으로 모든 참가자에게 브로드캐스트하여
+> 동기화된 게임 경험을 제공합니다.
 
 ---
 
 ## 기술 스택
 
-### 프레임워크
+### ✅ 현재 사용 중 (Phase 1)
 - **Django 5.1**: 웹 프레임워크
 - **Django REST Framework 3.15**: REST API 구현
-- **Django Channels 4.1**: WebSocket 구현 (나중에)
-
-### 데이터베이스
-- **SQLite**: 개발/학교 프로젝트용
-
-### 실시간 통신 (나중에 추가)
-- **Django Channels**: WebSocket 서버
-- **Redis** (선택): 메시지 레이어 (배포 시)
-
-### 도구
+- **SQLite**: 데이터베이스 (개발용)
 - **Postman**: API 테스트
+
+### 🔜 Phase 2 예정
+- **Django Channels**: WebSocket 실시간 통신
+- **Redis** (선택): 채널 레이어 (배포 시)
+
+### 🛠️ 개발 도구
 - **Git**: 버전 관리
+- **Python 3.13**: 프로그래밍 언어
 
 ---
 
