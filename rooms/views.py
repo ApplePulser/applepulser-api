@@ -48,19 +48,31 @@ class LeaveRoomView(APIView):
         room = get_object_or_404(Room, room_id=room_id)
         player = get_object_or_404(Player, player_id=player_id, room=room)
 
-        # 3. 호스트는 퇴장 불가
+        # 3. 호스트 퇴장 시 방 삭제
         if player.is_host:
-            return Response(
-                {"error" : "Host cannot leave the room"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # 4. Player 삭제
+            room_code = room.room_code  # 삭제 전 저장
+            room.delete()  # CASCADE로 모든 플레이어도 자동 삭제됨
+            return Response({
+                "message": "Room deleted (host left)",
+                "room_code": room_code
+            }, status=status.HTTP_200_OK)
+
+        # 4. 일반 플레이어 삭제
         player.delete()
+
         # 5. 성공 응답
         return Response({"message": "Successfully left the room"})
 
 class JoinRoomView(APIView):
+    """
+    방 참가 API
+    POST /api/rooms/{room_id}/join/
+    Body: {"nickname": "철수"}
+
+    제약사항:
+    - 게임이 시작되지 않은 방(WAITING 상태)만 참가 가능
+    - 방 인원이 max_players 미만이어야 함
+    """
     def post(self, request, room_id):
         # 1. nickname 인증
         serializer = JoinRoomSerializer(data=request.data)
@@ -77,9 +89,9 @@ class JoinRoomView(APIView):
         # 3. 게임 시작 여부 확인
         if room.status != Room.Status.WAITING:
             return Response(
-        {"error": "Game already started"},
-        status=status.HTTP_400_BAD_REQUEST
-        )
+                {"error": "Game already started"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # 4. 방인원 확인
         current_players = room.players.count()
@@ -149,6 +161,22 @@ class RoomDeleteView(APIView):
         
 
 class GameStartView(APIView):
+    """
+    게임 시작 API
+    POST /api/rooms/{room_id}/start/
+    Body: {
+        "player_id": "xxx",
+        "mode": "steady_beat" | "pulse_rush",
+        "time_limit_seconds": 120,
+        "bpm_min": 60,
+        "bpm_max": 120
+    }
+
+    요구사항:
+    - 방장만 게임 시작 가능
+    - 모든 플레이어가 READY 상태여야 함
+    - 게임 시작 시 Room과 모든 Player 상태가 PLAYING으로 변경됨
+    """
     def post(self, request, room_id):
         # 1. 게임 설정 데이터 검증
         serializer =  GameStartSerializer(data=request.data)
@@ -172,14 +200,15 @@ class GameStartView(APIView):
         room = get_object_or_404(Room, room_id=room_id)
         player = get_object_or_404(Player, player_id=player_id, room=room)
 
-        # 5. 방장 권한 검증
+        # 4. 방장 권한 검증
         if not player.is_host:
             return Response(
                 {"error": "Only host can start the game"},  
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 6. 모든 플레이어 준비 확인 (READY 상태여야 함)
+        # 5. 모든 플레이어 준비 확인
+        # 방장 포함 모든 플레이어가 READY 상태여야 게임 시작 가능
         total_players = room.players.count()
         ready_players = room.players.filter(status=Player.Status.READY).count()
 
@@ -192,7 +221,7 @@ class GameStartView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 7. Room에 게임 설정 저장
+        # 6. Room에 게임 설정 저장
         room.mode = mode
         room.time_limit_seconds = time_limit
         room.bpm_min = bpm_min
@@ -200,6 +229,9 @@ class GameStartView(APIView):
         room.status = Room.Status.PLAYING  # TextChoices 사용
         room.started_at = timezone.now()
         room.save()
+
+        # 7. 모든 플레이어 상태를 PLAYING으로 변경
+        room.players.update(status=Player.Status.PLAYING)
 
         # 8. 게임 시작 정보 응답
         return Response({
@@ -245,7 +277,7 @@ class RoomCreateView(APIView):
         )
 
         # 3. 방장(Host) Player 생성
-        host_nickname = Player.objects.create(
+        host = Player.objects.create(
             room=room,
             nickname=host_nickname,
             status=Player.Status.WAITING,  # TextChoices 사용 (입장 직후)

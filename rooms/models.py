@@ -1,6 +1,3 @@
-from django.db import models
-import uuid
-
 import uuid
 from django.db import models
 
@@ -91,7 +88,7 @@ class Player(models.Model):
     @property
     def host(self):
         """방장 플레이어 반환"""
-        return self.players.filter(is_host=True).first()
+        return self.room.players.filter(is_host=True).first()
     
     def save(self, *args, **kwargs):
         if not self.player_id:
@@ -104,10 +101,3 @@ class Player(models.Model):
     class Meta:
         ordering = ['joined_at']
 
-
-
-
-
-
-
-# Create your models here.
