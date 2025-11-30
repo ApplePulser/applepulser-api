@@ -35,10 +35,11 @@ class Room(models.Model):
     # 방 생성 시간 (자동 저장)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    # 게임 모드 (필수 선택)
+    # 게임 모드 (기본값: steady_beat)
     mode = models.CharField(
         max_length=20,
-        choices=Mode.choices
+        choices=Mode.choices,
+        default=Mode.STEADY_BEAT  # 안전장치: 기본값 설정
     )
     
     # 게임 제한 시간 (기본값: 120초 = 2분)
