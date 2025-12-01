@@ -2,9 +2,9 @@
 
 # Heart Sync Backend Architecture
 
-## 📊 현재 프로젝트 상태 (2025-11-05)
+## 📊 현재 프로젝트 상태 (2025-11-25)
 
-### ✅ **Phase 1 완료!** 🎉
+### ✅ **Phase 1 & Phase 2 완료!** 🎉
 
 #### 1. Models (데이터베이스 설계) ✅
 - **Room 모델**: 게임 방 관리 (room_id, room_code 자동 생성)
@@ -37,19 +37,23 @@
 - **마이그레이션**: 데이터베이스 스키마 생성 완료
 - **Postman 테스트**: 전체 API 엔드포인트 검증 완료
 
-### 🚀 **다음 작업: Phase 2 시작!**
+#### 6. WebSocket 실시간 통신 ✅ **NEW!**
+- **Django Channels 설치**: channels==4.3.1
+- **Daphne ASGI 서버**: daphne==4.2.1
+- **GameConsumer**: 방별 그룹 관리 및 심박수 브로드캐스트
+- **WebSocket 라우팅**: `ws://localhost:8000/ws/game/{room_id}/`
+- **채널 레이어**: InMemoryChannelLayer (개발용)
+- **실시간 데이터 전송**: 플레이어 심박수 실시간 공유
 
-**Phase 2: WebSocket 실시간 통신**
-- Django Channels 설치 및 설정
-- GameConsumer 구현
-- 심박수 실시간 브로드캐스트
+### 🚀 **다음 작업: Phase 3 시작!**
 
 **Phase 3: 최적화 및 배포 준비**
 - 코드 최적화
 - 에러 핸들링 강화
+- Redis 채널 레이어 적용 (배포용)
 - 안드로이드 앱 연동
 
-### 📈 **진행률: Phase 1 - 100% 완료** ✅ → **Phase 2 시작 준비!**
+### 📈 **진행률: Phase 1 - 100% 완료** ✅ | **Phase 2 - 100% 완료** ✅ → **Phase 3 시작 준비!**
 
 ---
 
@@ -97,6 +101,8 @@ pip install -r requirements.txt
 **설치되는 패키지:**
 - Django 5.1
 - Django REST Framework 3.15
+- Django Channels 4.3.1 (WebSocket 지원)
+- Daphne 4.2.1 (ASGI 서버)
 - 기타 필요한 라이브러리들
 
 ### 4️⃣ 데이터베이스 마이그레이션
@@ -177,10 +183,11 @@ GET http://127.0.0.1:8000/api/rooms/{room_id}/
 
 ### **방 참가 (POST)**
 ```bash
-POST http://127.0.0.1:8000/api/rooms/{room_id}/join/
+POST http://127.0.0.1:8000/api/rooms/join/
 Content-Type: application/json
 
 {
+  "room_code": "123456",
   "nickname": "플레이어1"
 }
 ```
@@ -257,16 +264,18 @@ heartsync\Scripts\activate
 applepulser-api/
 │
 ├── heart_sync_backend/      # Django 프로젝트 설정 폴더
-│   ├── settings.py          # Django 설정 파일
+│   ├── settings.py          # Django 설정 파일 (Channels, ASGI 설정 포함)
 │   ├── urls.py              # 메인 URL 라우팅
-│   ├── asgi.py              # WebSocket용 (Phase 2)
-│   └── wsgi.py              # HTTP 서버용
+│   ├── asgi.py              # ASGI 설정 (HTTP + WebSocket)
+│   └── wsgi.py              # WSGI 설정 (배포용)
 │
 ├── rooms/                   # 게임 방 관리 앱
 │   ├── models.py            # Room, Player 모델
 │   ├── serializers.py       # 데이터 직렬화
 │   ├── views.py             # REST API 뷰
 │   ├── urls.py              # API 엔드포인트 라우팅
+│   ├── routing.py           # WebSocket URL 패턴
+│   ├── consumers.py         # GameConsumer (WebSocket 처리)
 │   ├── admin.py             # Admin 페이지 설정
 │   └── tests.py             # 테스트 코드
 │
@@ -297,9 +306,9 @@ class Room(models.Model):
     max_players = IntegerField(default=4)                 # 최대 4명
     created_at = DateTimeField(auto_now_add=True)         # 방 생성 시간 자동
 
-    # 게임 설정 (방 생성 시 필수 입력)
-    mode = CharField(max_length=20)                       # steady_beat/pulse_rush (TextChoices)
-    time_limit_seconds = IntegerField(default=120)        # 게임 시간 (기본 2분)
+    # 게임 설정
+    mode = CharField(max_length=20, default='steady_beat') # steady_beat/pulse_rush (TextChoices, 기본값: steady_beat)
+    time_limit_seconds = IntegerField(default=120)         # 게임 시간 (기본 2분)
 
     # BPM 설정 (선택 사항)
     bpm_min = IntegerField(null=True, blank=True)         # 최소 심박수
@@ -404,6 +413,7 @@ fields: ['room_id', 'room_code', 'status', 'max_players', 'players', 'created_at
 #### 4. 액션 Serializers
 ```python
 # JoinRoomSerializer - 방 참가
+- room_code: 6자리 방 코드 (QR코드에서 읽음)
 - nickname: 2-10자 닉네임
 
 # LeaveRoomSerializer - 방 퇴장
@@ -459,16 +469,17 @@ GET /api/rooms/{room_id}/
 
 #### 3. JoinRoomView
 ```python
-POST /api/rooms/{room_id}/join/
-Body: {"nickname": "플레이어1"}
+POST /api/rooms/join/
+Body: {"room_code": "123456", "nickname": "플레이어1"}
 
 기능:
-- 닉네임 검증 (2-10자)
+- room_code와 닉네임 검증 (2-10자)
+- room_code로 방 찾기 (QR코드 지원)
 - 방 상태 확인 (WAITING만 입장 가능)
 - 인원 제한 확인 (max_players)
 - Player 생성 (status=WAITING, is_host=False)
 
-응답: 200 OK (생성된 플레이어 정보)
+응답: 200 OK (방 전체 정보 + 모든 플레이어 리스트)
 ```
 
 #### 4. LeaveRoomView
@@ -559,12 +570,71 @@ Django Admin을 통한 관리자 페이지 구현
 
 ---
 
-## WebSocket 실시간 통신 (Phase 2 예정)
+## WebSocket 실시간 통신 ✅
 
-> **Phase 2에서 구현 예정**
-> - Django Channels를 사용한 WebSocket 서버
-> - 실시간 심박수 데이터 브로드캐스트
-> - 게임 이벤트 실시간 동기화
+### 연결 정보
+**WebSocket URL:** `ws://localhost:8000/ws/game/{room_id}/`
+
+### 메시지 형식
+
+#### 1. 심박수 전송
+```json
+// 클라이언트 → 서버
+{
+  "type": "heart_rate",
+  "player_id": "uuid-xxx",
+  "bpm": 85
+}
+
+// 서버 → 모든 클라이언트 (브로드캐스트)
+{
+  "type": "heart_rate",
+  "player_id": "uuid-xxx",
+  "bpm": 85
+}
+```
+
+#### 2. Ping/Pong (연결 유지 확인)
+```json
+// 클라이언트 → 서버 (5초마다)
+{
+  "type": "ping"
+}
+
+// 서버 → 클라이언트
+{
+  "type": "pong"
+}
+```
+
+#### 3. 플레이어 연결 끊김 알림
+```json
+// 서버 → 모든 클라이언트 (연결 끊김 감지 시)
+{
+  "type": "player_disconnected",
+  "player_id": "uuid-xxx",
+  "nickname": "철수"
+}
+```
+
+### WebSocket 연결 관리
+
+#### 서버 측 (구현 완료) ✅
+- **Ping/Pong 처리**: Ping 메시지 수신 시 즉시 Pong 응답
+- **연결 끊김 감지**: 5초마다 체크, 15초 동안 ping 없으면 타임아웃
+- **자동 탈락 처리**:
+  - PLAYING 상태일 때만 연결 끊김 감지
+  - 타임아웃 시 Player 상태를 FINISHED로 변경
+  - 모든 플레이어에게 `player_disconnected` 메시지 브로드캐스트
+- **연결 해제**: 그룹에서 자동 제거 및 WebSocket 종료
+
+#### 클라이언트 측 (안드로이드 앱에서 구현 필요)
+- **5초마다 Ping 전송**: 서버 연결 유지 확인
+- **Pong 응답 확인**: 서버가 정상 동작 중인지 체크
+- **타이머 리셋**: Pong 받을 때마다 타이머 초기화
+- **재연결 로직**: Exponential Backoff 방식 권장 (2초, 4초, 8초, 16초...)
+- **연결 상태 UI**: 연결됨/끊김/재연결 중 상태 표시
+- **연결 끊김 알림 처리**: `player_disconnected` 메시지 수신 시 해당 플레이어를 해골(💀) 또는 탈락 상태로 표시
 
 ---
 
@@ -600,19 +670,18 @@ Django Admin을 통한 관리자 페이지 구현
 
 ## 기술 스택
 
-### ✅ 현재 사용 중 (Phase 1)
+### ✅ 현재 사용 중
 - **Django 5.1**: 웹 프레임워크
 - **Django REST Framework 3.15**: REST API 구현
-- **SQLite**: 데이터베이스 (개발용)
-- **Postman**: API 테스트
-
-### 🔜 Phase 2 예정
-- **Django Channels**: WebSocket 실시간 통신
-- **Redis** (선택): 채널 레이어 (배포 시)
+- **Django Channels 4.3.1**: WebSocket 실시간 통신
+- **Daphne 4.2.1**: ASGI 서버
+- **SQLite**: 데이터베이스 (로컬 개발용)
+- **InMemoryChannelLayer**: 채널 레이어 (로컬 개발용)
 
 ### 🛠️ 개발 도구
 - **Git**: 버전 관리
 - **Python 3.13**: 프로그래밍 언어
+- **Postman**: API 테스트
 
 ---
 
@@ -642,15 +711,20 @@ Django Admin을 통한 관리자 페이지 구현
 
 **🎉 Phase 1 완료! 모든 REST API 정상 동작 확인!**
 
-### Phase 2: WebSocket 실시간 통신
-- [ ] Django Channels 설치 및 설정
-- [ ] ASGI 설정 (asgi.py)
-- [ ] GameConsumer 구현
-  - [ ] WebSocket 연결/해제
-  - [ ] 심박수 데이터 수신
-  - [ ] 실시간 브로드캐스트
-- [ ] 채널 레이어 설정 (Redis 선택)
-- [ ] WebSocket 테스트
+### Phase 2: WebSocket 실시간 통신 ✅ **완료!**
+- [x] Django Channels 설치 및 설정
+- [x] ASGI 설정 (asgi.py)
+- [x] GameConsumer 구현
+  - [x] WebSocket 연결/해제
+  - [x] 심박수 데이터 수신
+  - [x] 실시간 브로드캐스트
+  - [x] Ping/Pong 연결 유지 메커니즘
+  - [x] 연결 끊김 감지 (5초 체크, 15초 타임아웃)
+  - [x] 자동 탈락 처리 (FINISHED 상태 변경)
+  - [x] player_disconnected 브로드캐스트
+- [x] 채널 레이어 설정 (InMemoryChannelLayer)
+- [x] WebSocket 라우팅 (routing.py)
+- [x] WebSocket 테스트 완료
 
 ### Phase 3: 최적화 및 배포 준비
 - [ ] 코드 리팩토링

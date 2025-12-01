@@ -8,9 +8,7 @@ from .serializers import (
     RoomDetailSerializer,
     LeaveRoomSerializer,
     JoinRoomSerializer,
-    PlayerSerializer,
-    GameStartSerializer,
-    RoomSerializer
+    GameStartSerializer
 )
 from django.utils import timezone
 
@@ -66,25 +64,26 @@ class LeaveRoomView(APIView):
 class JoinRoomView(APIView):
     """
     방 참가 API
-    POST /api/rooms/{room_id}/join/
-    Body: {"nickname": "철수"}
+    POST /api/rooms/join/
+    Body: {"room_code": "123456", "nickname": "철수"}
 
     제약사항:
     - 게임이 시작되지 않은 방(WAITING 상태)만 참가 가능
     - 방 인원이 max_players 미만이어야 함
     """
-    def post(self, request, room_id):
-        # 1. nickname 인증
+    def post(self, request):
+        # 1. room_code와 nickname 검증
         serializer = JoinRoomSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(
                 serializer.errors,
                 status = status.HTTP_400_BAD_REQUEST
             )
+        room_code = serializer.validated_data["room_code"]
         nickname = serializer.validated_data["nickname"]
-        
-        # 2. Room 찾기
-        room  = get_object_or_404(Room, room_id=room_id)
+
+        # 2. Room 찾기 (room_code로 찾기)
+        room = get_object_or_404(Room, room_code=room_code)
 
         # 3. 게임 시작 여부 확인
         if room.status != Room.Status.WAITING:
@@ -110,10 +109,10 @@ class JoinRoomView(APIView):
             is_host=False
         )
 
-        # 6. 생성된 Player 정보 응답
-        player_serializer = PlayerSerializer(player)
-        
-        return Response(player_serializer.data, status=status.HTTP_200_OK)
+        # 6. 방 전체 정보 응답 (모든 플레이어 포함)
+        room_serializer = RoomDetailSerializer(room)
+
+        return Response(room_serializer.data, status=status.HTTP_200_OK)
 
 
 
@@ -273,18 +272,19 @@ class RoomCreateView(APIView):
 
         # 2. Room 생성 (room_id와 room_code는 모델의 save()에서 자동 생성)
         room = Room.objects.create(
-            status=Room.Status.WAITING  # TextChoices 사용
+            status=Room.Status.WAITING,  # TextChoices 사용
+            mode=Room.Mode.STEADY_BEAT  # 기본 모드 설정 (안전장치)
         )
 
         # 3. 방장(Host) Player 생성
-        host = Player.objects.create(
+        Player.objects.create(
             room=room,
             nickname=host_nickname,
             status=Player.Status.WAITING,  # TextChoices 사용 (입장 직후)
             is_host=True
         )
 
-        # 4. 응답 (RoomSerializer 사용)
+        # 4. 응답 (RoomDetailSerializer 사용)
         serializer = RoomDetailSerializer(room)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

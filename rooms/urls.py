@@ -16,11 +16,11 @@ urlpatterns = [
     # POST /api/rooms/ - 방 생성
     path('', RoomCreateView.as_view(), name='room-create'),
 
+    # POST /api/rooms/join/ - 방 참가
+    path('join/', JoinRoomView.as_view(), name='room-join'),
+
     # GET /api/rooms/{room_id}/ - 방 상세 조회
     path('<str:room_id>/', RoomDetailView.as_view(), name='room-detail'),
-
-    # POST /api/rooms/{room_id}/join/ - 방 참가
-    path('<str:room_id>/join/', JoinRoomView.as_view(), name='room-join'),
 
     # POST /api/rooms/{room_id}/leave/ - 방 퇴장
     path('<str:room_id>/leave/', LeaveRoomView.as_view(), name='room-leave'),

@@ -58,8 +58,10 @@ class RoomDetailSerializer(serializers.ModelSerializer):
 class JoinRoomSerializer(serializers.Serializer):
     """
     방 참가 요청 Serializer
-    - 닉네임만 입력 받음 (2-10자)
+    - room_code: 6자리 방 코드 (QR코드에서 읽음)
+    - nickname: 닉네임 (2-10자)
     """
+    room_code = serializers.CharField(min_length=6, max_length=6)
     nickname = serializers.CharField(min_length=2, max_length=10)
 
 
