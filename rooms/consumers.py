@@ -42,7 +42,7 @@ class GameConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
         except json.JSONDecodeError:
             await self.send(text_data=json.dumps({'error':'Invalid JSON'}))
-
+            return
 
         message_type = data.get('type')
 
