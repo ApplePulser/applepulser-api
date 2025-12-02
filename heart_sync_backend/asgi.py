@@ -8,14 +8,16 @@ https://docs.djangoproject.com/en/5.1/howto/deployment/asgi/
 """
 
 import os
-from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
-from rooms.routing import websocket_urlpatterns
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "heart_sync_backend.settings")
 
-# Django ASGI 애플리케이션 먼저 초기화
+# Django ASGI 애플리케이션 먼저 초기화 (반드시 import 전에!)
 django_asgi_app = get_asgi_application()
+
+# Django 초기화 후에 import
+from channels.routing import ProtocolTypeRouter, URLRouter
+from rooms.routing import websocket_urlpatterns
 
 # HTTP와 WebSocket 라우팅 설정
 application = ProtocolTypeRouter({
