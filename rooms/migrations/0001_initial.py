@@ -72,6 +72,7 @@ class Migration(migrations.Migration):
                     models.CharField(
                         choices=[
                             ("waiting", "대기 중"),
+                            ("ready", "준비 완료"),
                             ("playing", "플레이 중"),
                             ("finished", "완료"),
                         ],

@@ -86,11 +86,6 @@ class Player(models.Model):
     is_host = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
 
-    @property
-    def host(self):
-        """방장 플레이어 반환"""
-        return self.room.players.filter(is_host=True).first()
-    
     def save(self, *args, **kwargs):
         if not self.player_id:
             self.player_id = str(uuid.uuid4())

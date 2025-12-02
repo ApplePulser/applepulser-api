@@ -38,7 +38,12 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         """ 클라이언트로부터 메시지 받을 때 실행 """
         # json 파싱
-        data = json.loads(text_data)
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({'error':'Invalid JSON'}))
+            return
+
         message_type = data.get('type')
 
         # Ping/Pong 처리 (연결 유지 확인)
