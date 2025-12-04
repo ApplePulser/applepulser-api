@@ -112,7 +112,7 @@ class JoinRoomView(APIView):
         # 6. 방 전체 정보 응답 (모든 플레이어 포함)
         room_serializer = RoomDetailSerializer(room)
 
-        return Response(room_serializer.data, status=status.HTTP_200_OK)
+        return Response({"player_id": player.player_id, **room_serializer.data}, status=status.HTTP_200_OK)
 
 
 
