@@ -54,6 +54,30 @@ class GameConsumer(AsyncWebsocketConsumer):
             }))
             return
 
+        # 플레이어 ready 상태 변경
+        if message_type == 'player_ready':
+            player_id = data.get('player_id')
+
+            # DB에서 플레이어 상태를 READY로 변경
+            result = await self.set_player_ready(player_id)
+
+            if result:
+                # 방의 모든 클라이언트에게 알림
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'send_player_ready',
+                        'player_id': player_id,
+                        'nickname': result['nickname']
+                    }
+                )
+            else:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Player not found'
+                }))
+            return
+
         # 심박수 데이터 처리
         if message_type == 'heart_rate':
             # 심박수 데이터 브로드캐스트
@@ -75,6 +99,14 @@ class GameConsumer(AsyncWebsocketConsumer):
                     'bpm': bpm,
                 }
             )
+    async def send_player_ready(self, event):
+        """그룹의 모든 클라이언트에게 플레이어 ready 상태 전송"""
+        await self.send(text_data=json.dumps({
+            'type': 'player_ready',
+            'player_id': event['player_id'],
+            'nickname': event['nickname']
+        }))
+
     async def send_heart_rate(self, event):
         """그룹의 모든 클라이언트에게 심박수 전송"""
         # WebSocket으로 메시지 보내기
@@ -110,6 +142,17 @@ class GameConsumer(AsyncWebsocketConsumer):
                 'nickname': player.nickname,
                 'status': player.status
             }
+        except Player.DoesNotExist:
+            return None
+
+    @database_sync_to_async
+    def set_player_ready(self, player_id):
+        """플레이어 상태를 READY로 변경"""
+        try:
+            player = Player.objects.get(player_id=player_id)
+            player.status = Player.Status.READY
+            player.save()
+            return {'nickname': player.nickname}
         except Player.DoesNotExist:
             return None
 
