@@ -1,8 +1,11 @@
+import asyncio
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from .models import Room, Player
 from .serializers import (
     RoomDetailSerializer,
@@ -11,6 +14,7 @@ from .serializers import (
     GameStartSerializer
 )
 from django.utils import timezone
+from .consumers import start_game_loop
 
 
 class RoomDetailView(APIView):
@@ -232,7 +236,46 @@ class GameStartView(APIView):
         # 7. 모든 플레이어 상태를 PLAYING으로 변경
         room.players.update(status=Player.Status.PLAYING)
 
-        # 8. 게임 시작 정보 응답
+        # 8. 플레이어 정보 리스트 생성
+        players_data = []
+        for p in room.players.all():
+            players_data.append({
+                'player_id': p.player_id,
+                'nickname': p.nickname,
+                'is_host': p.is_host
+            })
+
+        # 9. 목표 BPM 계산
+        target_bpm = (bpm_min + bpm_max) // 2
+
+        # 10. WebSocket으로 game_start 브로드캐스트
+        channel_layer = get_channel_layer()
+        room_group_name = f'game_{room_id}'
+
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                'type': 'game_start',
+                'total_time': time_limit,
+                'min_bpm': bpm_min,
+                'max_bpm': bpm_max,
+                'target_bpm': target_bpm,
+                'players': players_data
+            }
+        )
+
+        # 11. 게임 루프 시작 (백그라운드)
+        asyncio.ensure_future(start_game_loop(
+            room_id=room_id,
+            total_time=time_limit,
+            min_bpm=bpm_min,
+            max_bpm=bpm_max,
+            target_bpm=target_bpm,
+            players=players_data,
+            channel_layer=channel_layer
+        ))
+
+        # 12. 게임 시작 정보 응답
         return Response({
             "message": "Game started",
             "room_id": room.room_id,
@@ -241,7 +284,8 @@ class GameStartView(APIView):
                 "mode": room.mode,
                 "time_limit": room.time_limit_seconds,
                 "bpm_min": room.bpm_min,
-                "bpm_max": room.bpm_max
+                "bpm_max": room.bpm_max,
+                "target_bpm": target_bpm
             },
             "started_at": room.started_at
         }, status=status.HTTP_200_OK)

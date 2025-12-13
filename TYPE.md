@@ -156,8 +156,8 @@
     "player_id": "방장-uuid",
     "mode": "steady_beat",
     "time_limit_seconds": 120,
-    "bpm_min": 60,
-    "bpm_max": 120
+    "bpm_min": 80,
+    "bpm_max": 90
 }
 ```
 | 필드 | 타입 | 필수 | 설명 |
@@ -177,8 +177,9 @@
     "game_settings": {
         "mode": "steady_beat",
         "time_limit": 120,
-        "bpm_min": 60,
-        "bpm_max": 120
+        "bpm_min": 80,
+        "bpm_max": 90,
+        "target_bpm": 85
     },
     "started_at": "2025-12-09T12:05:00.000000Z"
 }
@@ -225,11 +226,11 @@
 
 ## WebSocket API
 
-**URL:** `ws://localhost:8000/ws/game/{room_id}/`
+**URL:** `ws://server/ws/game/{room_id}/`
 
-### 메시지 타입
+---
 
-#### 1. Ping/Pong (연결 유지)
+### 1. Ping/Pong (연결 유지)
 ```json
 // 클라이언트 → 서버 (5초마다)
 {"type": "ping"}
@@ -238,28 +239,91 @@
 {"type": "pong"}
 ```
 
-#### 2. 심박수 전송
+---
+
+### 2. Ready 상태 변경
 ```json
 // 클라이언트 → 서버
-{"type": "heart_rate", "player_id": "uuid", "bpm": 85}
+{"type": "player_ready", "player_id": "uuid", "is_ready": true}
+{"type": "player_ready", "player_id": "uuid", "is_ready": false}
 
-// 서버 → 모든 클라이언트
-{"type": "heart_rate", "player_id": "uuid", "bpm": 85}
+// 서버 → 전체 브로드캐스트
+{"type": "player_ready", "player_id": "uuid", "is_ready": true}
+{"type": "player_ready", "player_id": "uuid", "is_ready": false}
 ```
 
-#### 3. Ready 상태 변경
+---
+
+### 3. 심박수 전송
 ```json
 // 클라이언트 → 서버
-{"type": "player_ready", "player_id": "uuid"}
+{"type": "heartbeat", "player_id": "uuid", "bpm": 85}
+// 또는
+{"type": "heart_rate", "player_id": "uuid", "bpm": 85}
+```
+※ 서버에서 수집 후 1초마다 정렬된 리스트로 브로드캐스트
 
-// 서버 → 모든 클라이언트
-{"type": "player_ready", "player_id": "uuid", "nickname": "철수"}
+---
+
+### 4. 게임 시작 (서버 → 전체)
+HTTP `/api/rooms/{room_id}/start/` 성공 시 서버가 브로드캐스트
+```json
+{
+    "type": "game_start",
+    "total_time": 120,
+    "min_bpm": 80,
+    "max_bpm": 90,
+    "target_bpm": 85,
+    "players": [
+        {"player_id": "uuid1", "nickname": "홍사인", "is_host": true},
+        {"player_id": "uuid2", "nickname": "신바다", "is_host": false},
+        {"player_id": "uuid3", "nickname": "김나경", "is_host": false}
+    ]
+}
 ```
 
-#### 4. 연결 끊김 알림
+---
+
+### 5. BPM 업데이트 (서버 → 전체, 1초마다)
 ```json
-// 서버 → 모든 클라이언트 (15초 타임아웃 시)
-{"type": "player_disconnected", "player_id": "uuid", "nickname": "철수"}
+{
+    "type": "bpm_update",
+    "rankings": [
+        {"player_id": "uuid2", "nickname": "신바다", "bpm": 90, "diff": 5},
+        {"player_id": "uuid3", "nickname": "김나경", "bpm": 100, "diff": 15},
+        {"player_id": "uuid1", "nickname": "홍사인", "bpm": 60, "diff": 25}
+    ]
+}
+```
+**정렬 기준:**
+1. diff(목표와 차이) 낮은 순
+2. 같으면 bpm 낮은 순
+
+---
+
+### 6. 게임 종료 (서버 → 전체)
+total_time 끝나면 서버가 브로드캐스트
+```json
+{
+    "type": "game_end",
+    "results": [
+        {"rank": 1, "player_id": "uuid2", "nickname": "신바다", "min_bpm": 85, "max_bpm": 95, "avg_mae": 4.75},
+        {"rank": 2, "player_id": "uuid3", "nickname": "김나경", "min_bpm": 95, "max_bpm": 110, "avg_mae": 12.75},
+        {"rank": 3, "player_id": "uuid1", "nickname": "홍사인", "min_bpm": 55, "max_bpm": 70, "avg_mae": 21.25}
+    ]
+}
+```
+**등수 기준:** avg_mae(평균 오차) 낮은 순
+
+---
+
+### 7. 연결 끊김 알림 (서버 → 전체)
+```json
+{
+    "type": "player_disconnected",
+    "player_id": "uuid",
+    "nickname": "철수"
+}
 ```
 
 ---
