@@ -241,7 +241,24 @@
 
 ---
 
-### 2. Ready 상태 변경
+### 2. 플레이어 참가 알림 (서버 → 전체)
+새 플레이어가 방에 참가하면 서버가 브로드캐스트
+```json
+{
+    "type": "player_joined",
+    "player": {
+        "player_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "nickname": "철수",
+        "is_host": false,
+        "is_ready": false
+    },
+    "total_players": 3
+}
+```
+
+---
+
+### 3. Ready 상태 변경
 ```json
 // 클라이언트 → 서버
 {"type": "player_ready", "player_id": "uuid", "is_ready": true}
@@ -254,7 +271,7 @@
 
 ---
 
-### 3. 심박수 전송
+### 4. 심박수 전송
 ```json
 // 클라이언트 → 서버
 {"type": "heartbeat", "player_id": "uuid", "bpm": 85}
@@ -265,7 +282,7 @@
 
 ---
 
-### 4. 게임 시작 (서버 → 전체)
+### 5. 게임 시작 (서버 → 전체)
 HTTP `/api/rooms/{room_id}/start/` 성공 시 서버가 브로드캐스트
 ```json
 {
@@ -284,7 +301,7 @@ HTTP `/api/rooms/{room_id}/start/` 성공 시 서버가 브로드캐스트
 
 ---
 
-### 5. BPM 업데이트 (서버 → 전체, 1초마다)
+### 6. BPM 업데이트 (서버 → 전체, 1초마다)
 ```json
 {
     "type": "bpm_update",
@@ -301,7 +318,7 @@ HTTP `/api/rooms/{room_id}/start/` 성공 시 서버가 브로드캐스트
 
 ---
 
-### 6. 게임 종료 (서버 → 전체)
+### 7. 게임 종료 (서버 → 전체)
 total_time 끝나면 서버가 브로드캐스트
 ```json
 {
@@ -317,7 +334,7 @@ total_time 끝나면 서버가 브로드캐스트
 
 ---
 
-### 7. 연결 끊김 알림 (서버 → 전체)
+### 8. 연결 끊김 알림 (서버 → 전체)
 ```json
 {
     "type": "player_disconnected",
