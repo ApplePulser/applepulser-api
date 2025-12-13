@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
@@ -282,16 +283,23 @@ class GameStartView(APIView):
             }
         )
 
-        # 11. 게임 루프 시작 (백그라운드)
-        asyncio.ensure_future(start_game_loop(
-            room_id=room_id,
-            total_time=time_limit,
-            min_bpm=bpm_min,
-            max_bpm=bpm_max,
-            target_bpm=target_bpm,
-            players=players_data,
-            channel_layer=channel_layer
-        ))
+        # 11. 게임 루프 시작 (백그라운드 스레드)
+        def run_game_loop():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(start_game_loop(
+                room_id=room_id,
+                total_time=time_limit,
+                min_bpm=bpm_min,
+                max_bpm=bpm_max,
+                target_bpm=target_bpm,
+                players=players_data,
+                channel_layer=channel_layer
+            ))
+            loop.close()
+
+        thread = threading.Thread(target=run_game_loop, daemon=True)
+        thread.start()
 
         # 12. 게임 시작 정보 응답
         return Response({
