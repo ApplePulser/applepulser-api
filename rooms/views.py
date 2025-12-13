@@ -113,7 +113,25 @@ class JoinRoomView(APIView):
             is_host=False
         )
 
-        # 6. 방 전체 정보 응답 (모든 플레이어 포함)
+        # 6. WebSocket으로 player_joined 브로드캐스트
+        channel_layer = get_channel_layer()
+        room_group_name = f'game_{room.room_id}'
+
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                'type': 'player_joined',
+                'player': {
+                    'player_id': str(player.player_id),
+                    'nickname': player.nickname,
+                    'is_host': player.is_host,
+                    'is_ready': player.status == Player.Status.READY
+                },
+                'total_players': room.players.count()
+            }
+        )
+
+        # 7. 방 전체 정보 응답 (모든 플레이어 포함)
         room_serializer = RoomDetailSerializer(room)
 
         return Response({"player_id": player.player_id, **room_serializer.data}, status=status.HTTP_200_OK)

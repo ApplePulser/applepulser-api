@@ -624,25 +624,43 @@ Django Admin을 통한 관리자 페이지 구현
 }
 ```
 
-#### 3. 플레이어 Ready 상태 변경
+#### 3. 플레이어 참가 알림
+```json
+// 서버 → 모든 클라이언트 (새 플레이어 참가 시)
+{
+  "type": "player_joined",
+  "player": {
+    "player_id": "uuid-xxx",
+    "nickname": "철수",
+    "is_host": false,
+    "is_ready": false
+  },
+  "total_players": 3
+}
+```
+- 새 플레이어가 방에 참가하면 기존 플레이어들에게 알림
+- UI에서 새 플레이어를 표시할 수 있음
+
+#### 4. 플레이어 Ready 상태 변경
 ```json
 // 클라이언트 → 서버
 {
   "type": "player_ready",
-  "player_id": "uuid-xxx"
+  "player_id": "uuid-xxx",
+  "is_ready": true
 }
 
 // 서버 → 모든 클라이언트 (브로드캐스트)
 {
   "type": "player_ready",
   "player_id": "uuid-xxx",
-  "nickname": "철수"
+  "is_ready": true
 }
 ```
-- DB에서 해당 플레이어 상태가 READY로 변경됨
+- DB에서 해당 플레이어 상태가 READY/WAITING으로 변경됨
 - 방의 모든 클라이언트에게 준비 상태 알림
 
-#### 4. 플레이어 연결 끊김 알림
+#### 5. 플레이어 연결 끊김 알림
 ```json
 // 서버 → 모든 클라이언트 (연결 끊김 감지 시)
 {

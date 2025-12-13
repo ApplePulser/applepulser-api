@@ -111,6 +111,14 @@ class GameConsumer(AsyncWebsocketConsumer):
             'is_ready': event['is_ready']
         }))
 
+    async def player_joined(self, event):
+        """새 플레이어 참가 알림"""
+        await self.send(text_data=json.dumps({
+            'type': 'player_joined',
+            'player': event['player'],
+            'total_players': event['total_players']
+        }))
+
     async def send_heart_rate(self, event):
         """심박수 전송 (레거시 지원)"""
         await self.send(text_data=json.dumps({
