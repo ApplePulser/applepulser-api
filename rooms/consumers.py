@@ -78,8 +78,8 @@ class GameConsumer(AsyncWebsocketConsumer):
                 }))
             return
 
-        # 심박수 데이터 처리
-        if message_type == 'heart_rate':
+        # 심박수 데이터 처리 (heart_rate 또는 heartbeat 둘 다 지원)
+        if message_type in ['heart_rate', 'heartbeat']:
             # 심박수 데이터 브로드캐스트
             player_id = data.get('player_id')
             bpm = data.get('bpm')
