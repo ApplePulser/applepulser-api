@@ -57,9 +57,10 @@ class GameConsumer(AsyncWebsocketConsumer):
         # 플레이어 ready 상태 변경
         if message_type == 'player_ready':
             player_id = data.get('player_id')
+            is_ready = data.get('is_ready', True)
 
-            # DB에서 플레이어 상태를 READY로 변경
-            result = await self.set_player_ready(player_id)
+            # DB에서 플레이어 상태 변경
+            result = await self.set_player_ready_status(player_id, is_ready)
 
             if result:
                 # 방의 모든 클라이언트에게 알림
@@ -68,7 +69,7 @@ class GameConsumer(AsyncWebsocketConsumer):
                     {
                         'type': 'send_player_ready',
                         'player_id': player_id,
-                        'nickname': result['nickname']
+                        'is_ready': is_ready
                     }
                 )
             else:
@@ -104,7 +105,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'player_ready',
             'player_id': event['player_id'],
-            'nickname': event['nickname']
+            'is_ready': event['is_ready']
         }))
 
     async def send_heart_rate(self, event):
@@ -146,13 +147,13 @@ class GameConsumer(AsyncWebsocketConsumer):
             return None
 
     @database_sync_to_async
-    def set_player_ready(self, player_id):
-        """플레이어 상태를 READY로 변경"""
+    def set_player_ready_status(self, player_id, is_ready):
+        """플레이어 상태를 READY 또는 WAITING으로 변경"""
         try:
             player = Player.objects.get(player_id=player_id)
-            player.status = Player.Status.READY
+            player.status = Player.Status.READY if is_ready else Player.Status.WAITING
             player.save()
-            return {'nickname': player.nickname}
+            return True
         except Player.DoesNotExist:
             return None
 
